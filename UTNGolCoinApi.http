@@ -1,0 +1,6 @@
+@UTNGolCoinApi_HostAddress = http://localhost:5273
+
+GET {{UTNGolCoinApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
