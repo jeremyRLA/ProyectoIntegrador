@@ -10,8 +10,8 @@ namespace UTNGolCoinApi.Data
         public DbSet<Billetera> Billeteras { get; set; }
         public DbSet<Transaccion> Transacciones { get; set; }
         public DbSet<Prediccion> Predicciones { get; set; }
-
         public DbSet<Partido> Partidos { get; set; }
+        public DbSet<BonoDiario> BonosDiarios { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

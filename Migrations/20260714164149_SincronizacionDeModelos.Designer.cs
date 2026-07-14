@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UTNGolCoinApi.Data;
@@ -11,9 +12,11 @@ using UTNGolCoinApi.Data;
 namespace UTNGolCoinApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260714164149_SincronizacionDeModelos")]
+    partial class SincronizacionDeModelos
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -41,30 +44,6 @@ namespace UTNGolCoinApi.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Billeteras");
-                });
-
-            modelBuilder.Entity("UTNGolCoinApi.Models.BonoDiario", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BilleteraId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("FechaBono")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Monto")
-                        .HasColumnType("numeric");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BilleteraId");
-
-                    b.ToTable("BonosDiarios");
                 });
 
             modelBuilder.Entity("UTNGolCoinApi.Models.Partido", b =>
@@ -175,17 +154,6 @@ namespace UTNGolCoinApi.Migrations
                     b.HasIndex("BilleteraId");
 
                     b.ToTable("Transacciones");
-                });
-
-            modelBuilder.Entity("UTNGolCoinApi.Models.BonoDiario", b =>
-                {
-                    b.HasOne("UTNGolCoinApi.Models.Billetera", "Billetera")
-                        .WithMany()
-                        .HasForeignKey("BilleteraId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Billetera");
                 });
 
             modelBuilder.Entity("UTNGolCoinApi.Models.Transaccion", b =>

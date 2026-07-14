@@ -169,5 +169,62 @@ namespace UTNGolCoinApi.Controllers
                 saldoActual = billetera.Saldo
             });
         }
+        [HttpPost("{usuarioId}/bono")]
+        public IActionResult ReclamarBonoDiario(string usuarioId)
+        {
+            var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
+
+            if (billetera == null)
+            {
+                return NotFound(new { mensaje = "No se encontró la billetera del usuario." });
+            }
+            if (billetera.Saldo > 0)
+            {
+                return BadRequest(new {mensaje ="El bono solo aplica cuando el saldo es cero"});
+            }
+
+            var hoy = DateTime.UtcNow.Date;
+
+            bool yaReclamo = _context.BonosDiarios.Any(b =>
+                b.BilleteraId == billetera.Id &&
+                b.FechaBono.Date == hoy);
+
+            if (yaReclamo)
+            {
+                return BadRequest(new { mensaje = "Ya reclamaste tu bono de hoy. Vuelve mañana." });
+            }
+
+            decimal montoBono = 1.00m;
+
+            billetera.Saldo += montoBono;
+
+            var bono = new BonoDiario
+            {
+                BilleteraId = billetera.Id,
+                FechaBono = DateTime.UtcNow,
+                Monto = montoBono
+            };
+
+            var transaccion = new Transaccion
+
+            {
+                BilleteraId = billetera.Id,
+                Billetera = billetera,
+                Tipo = "Bono Diario",
+                Monto = montoBono,
+                FechaTransaccion = DateTime.UtcNow
+            };
+
+            _context.BonosDiarios.Add(bono);
+            _context.Transacciones.Add(transaccion);
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                exito = true,
+                mensaje = $"¡Bono diario de {montoBono} monedas reclamado exitosamente!",
+                saldoActual = billetera.Saldo
+            });
+        }
     }
 }
