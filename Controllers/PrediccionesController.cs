@@ -15,10 +15,11 @@ namespace UTNGolCoinApi.Controllers
             _context = context;
         }
 
+        // 1. Ajustamos el Request para que coincida con tus variables
         public class CrearPrediccionRequest
         {
             public string UsuarioId { get; set; }
-            public string PartidoId { get; set; }
+            public string PartidoCodigo { get; set; }
             public string ResultadoPronosticado { get; set; }
             public decimal MontoApostado { get; set; }
             public decimal Cuota { get; set; }
@@ -45,13 +46,19 @@ namespace UTNGolCoinApi.Controllers
             }
 
             billetera.Saldo -= request.MontoApostado;
+
+            // 2. Mapeamos exactamente como lo exige tu Prediccion.cs
             var nuevaPrediccion = new Prediccion
             {
-                UsuarioId = request.UsuarioId,
-                PartidoId = request.PartidoId,
+                BilleteraId = billetera.Id,
+                UsuarioId = request.UsuarioId, // Llenamos el required
+                PartidoId = request.PartidoCodigo, // Llenamos el required reciclando el código
+                PartidoCodigo = request.PartidoCodigo,
                 ResultadoPronosticado = request.ResultadoPronosticado,
                 MontoApostado = request.MontoApostado,
-                Cuota = request.Cuota
+                Cuota = request.Cuota,
+                Estado = "PENDIENTE",
+                FechaRegistro = DateTime.UtcNow
             };
 
             _context.Predicciones.Add(nuevaPrediccion);
@@ -61,12 +68,11 @@ namespace UTNGolCoinApi.Controllers
                 BilleteraId = billetera.Id,
                 Billetera = billetera,
                 Tipo = "Prediccion",
-                Monto = -request.MontoApostado, 
+                Monto = -request.MontoApostado,
                 FechaTransaccion = DateTime.UtcNow
             };
 
             _context.Transacciones.Add(transaccion);
-
             _context.SaveChanges();
 
             return Ok(new
@@ -77,6 +83,7 @@ namespace UTNGolCoinApi.Controllers
                 prediccionId = nuevaPrediccion.Id
             });
         }
+
         [HttpGet("historial/{usuarioId}")]
         public IActionResult ObtenerPrediccionesUsuario(string usuarioId)
         {
@@ -93,6 +100,71 @@ namespace UTNGolCoinApi.Controllers
                 .ToList();
 
             return Ok(predicciones);
+        }
+
+        [HttpPost("liquidar/{codigoPartido}")]
+        public IActionResult LiquidarPredicciones(string codigoPartido, [FromBody] ResultadoRequest request)
+        {
+            var prediccionesPendientes = _context.Predicciones
+                .Where(p => p.PartidoCodigo == codigoPartido && p.Estado == "PENDIENTE")
+                .ToList();
+
+            if (!prediccionesPendientes.Any())
+            {
+                return Ok(new { mensaje = "No hay predicciones pendientes para este partido." });
+            }
+
+            int ganadores = 0;
+            int perdedores = 0;
+            decimal totalPagado = 0;
+
+            foreach (var prediccion in prediccionesPendientes)
+            {
+                // 3. Volvemos a usar las propiedades correctas para las matemáticas
+                if (prediccion.ResultadoPronosticado == request.ResultadoOficial)
+                {
+                    prediccion.Estado = "GANADA";
+                    ganadores++;
+
+                    decimal premio = prediccion.MontoApostado * prediccion.Cuota;
+
+                    var billetera = _context.Billeteras.Find(prediccion.BilleteraId);
+                    if (billetera != null)
+                    {
+                        billetera.Saldo += premio;
+                        totalPagado += premio;
+
+                        var transaccion = new Transaccion
+                        {
+                            BilleteraId = billetera.Id,
+                            Billetera = billetera,
+                            Tipo = "Premio",
+                            Monto = premio,
+                            FechaTransaccion = DateTime.UtcNow
+                        };
+                        _context.Transacciones.Add(transaccion);
+                    }
+                }
+                else
+                {
+                    prediccion.Estado = "PERDIDA";
+                    perdedores++;
+                }
+            }
+
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                exito = true,
+                mensaje = $"Liquidación completada para el partido {codigoPartido}.",
+                estadisticas = new
+                {
+                    ganadores,
+                    perdedores,
+                    monedasRepartidas = totalPagado
+                }
+            });
         }
     }
 }

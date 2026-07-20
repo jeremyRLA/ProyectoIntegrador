@@ -8,6 +8,7 @@
         public required string UsuarioId { get; set; }
         public required string PartidoId { get; set; }
 
+        public string PartidoCodigo { get; set; }
         public required string ResultadoPronosticado { get; set; }
         public decimal MontoApostado { get; set; }
         public decimal Cuota { get; set; }

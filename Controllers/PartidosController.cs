@@ -15,18 +15,6 @@ namespace UTNGolCoinApi.Controllers
         {
             _context = context;
         }
-        [HttpGet("crear")]
-        public IActionResult CrearPartido([FromBody] Partido partido)
-        {
-            _context.Partidos.Add(partido);
-            _context.SaveChanges();
-
-            return Ok( new
-                { exito = true,
-                  mensaje = "Partido creado exitosamente",      
-                  partido = partido
-            });
-        }
         [HttpGet("disponibles")]
         public IActionResult ObtenerPartidosDisponibles()
         {
