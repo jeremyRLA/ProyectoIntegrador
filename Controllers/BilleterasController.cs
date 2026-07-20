@@ -18,6 +18,12 @@ namespace UTNGolCoinApi.Controllers
         {
             public string UsuarioId { get; set; }
         }
+        [HttpGet]
+        public IActionResult ObtenerTodasLasBilleteras()
+        {
+            var billeteras = _context.Billeteras.ToList();
+            return Ok(billeteras);
+        }
 
         [HttpPost("crear")]
         public IActionResult CrearBilletera([FromBody] CrearBilleteraRequest request)
