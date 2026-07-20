@@ -232,5 +232,23 @@ namespace UTNGolCoinApi.Controllers
                 saldoActual = billetera.Saldo
             });
         }
+        [HttpGet("{usuarioId}/transacciones")]
+        public IActionResult ObtenerTransacciones(string usuarioId)
+        {
+            var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
+
+            if (billetera == null)
+            {
+                return NotFound(new { mensaje = "No se encontró la billetera del usuario." });
+            }
+
+            var transacciones = _context.Transacciones
+                .Where(t => t.BilleteraId == billetera.Id)
+                .OrderByDescending(t => t.FechaTransaccion)
+                .ToList();
+
+            return Ok(transacciones);
+        }
     }
+
 }

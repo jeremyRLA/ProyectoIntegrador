@@ -77,5 +77,22 @@ namespace UTNGolCoinApi.Controllers
                 prediccionId = nuevaPrediccion.Id
             });
         }
+        [HttpGet("historial/{usuarioId}")]
+        public IActionResult ObtenerPrediccionesUsuario(string usuarioId)
+        {
+            var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
+
+            if (billetera == null)
+            {
+                return NotFound(new { mensaje = "No se encontró la billetera del usuario." });
+            }
+
+            var predicciones = _context.Predicciones
+                .Where(p => p.BilleteraId == billetera.Id)
+                .OrderByDescending(p => p.FechaRegistro)
+                .ToList();
+
+            return Ok(predicciones);
+        }
     }
 }

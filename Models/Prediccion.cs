@@ -3,6 +3,8 @@
     public class Prediccion
     {
         public int Id { get; set; }
+
+        public int BilleteraId { get; set; }
         public required string UsuarioId { get; set; }
         public required string PartidoId { get; set; }
 
