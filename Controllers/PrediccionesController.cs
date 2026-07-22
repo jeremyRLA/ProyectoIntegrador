@@ -16,7 +16,6 @@ namespace UTNGolCoinApi.Controllers
             _context = context;
         }
 
-        // 1. Ajustamos el Request para que coincida con tus variables
         public class CrearPrediccionRequest
         {
             public string UsuarioId { get; set; }
@@ -120,7 +119,6 @@ namespace UTNGolCoinApi.Controllers
 
             foreach (var prediccion in prediccionesPendientes)
             {
-                // 3. Volvemos a usar las propiedades correctas para las matemáticas
                 if (prediccion.ResultadoPronosticado == request.ResultadoOficial)
                 {
                     prediccion.Estado = "GANADA";

@@ -16,8 +16,9 @@ namespace UTNGolCoinApi.Controllers
 
         public class CrearBilleteraRequest
         {
-            public string UsuarioId { get; set; }
+            public string usuario_id { get; set; } 
         }
+
         [HttpGet]
         public IActionResult ObtenerTodasLasBilleteras()
         {
@@ -28,12 +29,12 @@ namespace UTNGolCoinApi.Controllers
         [HttpPost("crear")]
         public IActionResult CrearBilletera([FromBody] CrearBilleteraRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.UsuarioId))
+            if (string.IsNullOrWhiteSpace(request.usuario_id))
             {
                 return BadRequest(new { mensaje = "El ID del usuario es obligatorio." });
             }
 
-            var existe = _context.Billeteras.Any(b => b.UsuarioId == request.UsuarioId);
+            var existe = _context.Billeteras.Any(b => b.UsuarioId == request.usuario_id);
             if (existe)
             {
                 return BadRequest(new { mensaje = "Este usuario ya tiene una billetera registrada." });
@@ -41,7 +42,7 @@ namespace UTNGolCoinApi.Controllers
 
             var nuevaBilletera = new Billetera
             {
-                UsuarioId = request.UsuarioId,
+                UsuarioId = request.usuario_id,
                 Saldo = 10.00m
             };
 
@@ -58,7 +59,7 @@ namespace UTNGolCoinApi.Controllers
             };
 
             _context.Transacciones.Add(transaccion);
-            _context.SaveChanges(); 
+            _context.SaveChanges();
 
             return Ok(new
             {
@@ -72,19 +73,12 @@ namespace UTNGolCoinApi.Controllers
         public IActionResult ConsultarSaldo(string usuarioId)
         {
             var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
+            if (billetera == null) return NotFound(new { mensaje = "No se encontró una billetera." });
 
-            if (billetera == null)
-            {
-                return NotFound(new { mensaje = "No se encontró una billetera para este usuario." });
-            }
-
-            return Ok(new
-            {
-                usuarioId = billetera.UsuarioId,
-                saldo = billetera.Saldo
-            });
+            return Ok(new { usuarioId = billetera.UsuarioId, saldo = billetera.Saldo });
         }
-        [HttpGet("{usuarioId}/transacciones")]
+
+[HttpGet("{usuarioId}/transacciones")]
         public IActionResult ObtenerHistorialTransacciones(string usuarioId)
         {
             var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
