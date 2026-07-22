@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UTNGolCoinApi.Data;
+using UTNGolCoinApi.Dtos;
 using UTNGolCoinApi.Models;
 
 namespace UTNGolCoinApi.Controllers
@@ -47,12 +48,11 @@ namespace UTNGolCoinApi.Controllers
 
             billetera.Saldo -= request.MontoApostado;
 
-            // 2. Mapeamos exactamente como lo exige tu Prediccion.cs
             var nuevaPrediccion = new Prediccion
             {
                 BilleteraId = billetera.Id,
-                UsuarioId = request.UsuarioId, // Llenamos el required
-                PartidoId = request.PartidoCodigo, // Llenamos el required reciclando el código
+                UsuarioId = request.UsuarioId, 
+                PartidoId = request.PartidoCodigo, 
                 PartidoCodigo = request.PartidoCodigo,
                 ResultadoPronosticado = request.ResultadoPronosticado,
                 MontoApostado = request.MontoApostado,
@@ -103,7 +103,7 @@ namespace UTNGolCoinApi.Controllers
         }
 
         [HttpPost("liquidar/{codigoPartido}")]
-        public IActionResult LiquidarPredicciones(string codigoPartido, [FromBody] ResultadoRequest request)
+        public IActionResult LiquidarPredicciones(string codigoPartido, [FromBody] Resultado request)
         {
             var prediccionesPendientes = _context.Predicciones
                 .Where(p => p.PartidoCodigo == codigoPartido && p.Estado == "PENDIENTE")

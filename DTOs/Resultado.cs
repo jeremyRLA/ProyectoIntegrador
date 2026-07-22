@@ -1,6 +1,6 @@
-﻿namespace UTNGolCoinApi.Models
+﻿namespace UTNGolCoinApi.Dtos
 {
-    public class ResultadoRequest
+    public class Resultado
     {
         public string ResultadoOficial { get; set; }
     }
