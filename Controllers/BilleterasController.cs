@@ -207,5 +207,36 @@ namespace UTNGolCoinApi.Controllers
                 return StatusCode(500, new { mensaje = "Error al ajustar el saldo.", detalle = ex.Message });
             }
         }
+        [HttpGet("ranking")]
+        public IActionResult ObtenerRanking()
+        {
+            try
+            {
+                
+                var ranking = _context.Billeteras
+                    .Select(b => new
+                    {
+                        usuarioId = b.UsuarioId,
+                        saldo = b.Saldo,
+                        
+                        aciertos = _context.Predicciones.Count(p => p.BilleteraId == b.Id && p.Estado == "GANADA")
+                    })
+                    
+                    .OrderByDescending(r => r.saldo)
+                    .ThenByDescending(r => r.aciertos)
+                    .Take(10) 
+                    .ToList();
+
+                return Ok(new
+                {
+                    exito = true,
+                    ranking = ranking
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { mensaje = "Error al obtener el ranking de usuarios.", detalle = ex.Message });
+            }
+        }
     }
 }
