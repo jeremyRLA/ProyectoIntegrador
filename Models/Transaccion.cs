@@ -9,5 +9,7 @@
         public required string Tipo { get; set; }
         public decimal Monto { get; set; }
         public DateTime FechaTransaccion { get; set; } = DateTime.UtcNow;
+
+        public string? Descripcion { get; set; }
     }
 }

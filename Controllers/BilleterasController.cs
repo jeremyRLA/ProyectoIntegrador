@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UTNGolCoinApi.Data;
+using UTNGolCoinApi.DTOs;
 using UTNGolCoinApi.Models;
 
 namespace UTNGolCoinApi.Controllers
@@ -27,14 +28,14 @@ namespace UTNGolCoinApi.Controllers
         }
 
         [HttpPost("crear")]
-        public IActionResult CrearBilletera([FromBody] CrearBilleteraRequest request)
+        public IActionResult CrearBilletera([FromBody] CrearBilletera request)
         {
-            if (string.IsNullOrWhiteSpace(request.usuario_id))
+            if (string.IsNullOrWhiteSpace(request.UsuarioId))
             {
                 return BadRequest(new { mensaje = "El ID del usuario es obligatorio." });
             }
 
-            var existe = _context.Billeteras.Any(b => b.UsuarioId == request.usuario_id);
+            var existe = _context.Billeteras.Any(b => b.UsuarioId == request.UsuarioId);
             if (existe)
             {
                 return BadRequest(new { mensaje = "Este usuario ya tiene una billetera registrada." });
@@ -45,7 +46,7 @@ namespace UTNGolCoinApi.Controllers
             {
                 var nuevaBilletera = new Billetera
                 {
-                    UsuarioId = request.usuario_id,
+                    UsuarioId = request.UsuarioId,
                     Saldo = 10.00m
                 };
 
@@ -65,12 +66,7 @@ namespace UTNGolCoinApi.Controllers
                 _context.SaveChanges();
                 transaction.Commit();
 
-                return Ok(new
-                {
-                    exito = true,
-                    mensaje = "Billetera creada exitosamente con el bono de bienvenida.",
-                    saldoActual = nuevaBilletera.Saldo
-                });
+                return Ok();
             }
             catch (Exception)
             {
@@ -168,6 +164,47 @@ namespace UTNGolCoinApi.Controllers
             {
                 transaction.Rollback();
                 return StatusCode(500, new { mensaje = "Ocurrió un error al procesar el bono diario." });
+            }
+        }
+        [HttpPut("{usuarioId}/saldo")]
+        public IActionResult AjustarSaldoAdministrativo(string usuarioId, [FromBody] AjustarSaldo request)
+        {
+            var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
+
+            if (billetera == null)
+                return NotFound(new { mensaje = "No se encontró la billetera del usuario." });
+
+            using var transaction = _context.Database.BeginTransaction();
+            try
+            {
+                decimal diferencia = request.NuevoSaldo - billetera.Saldo;
+
+                
+                billetera.Saldo = request.NuevoSaldo;
+            
+                _context.Transacciones.Add(new Transaccion
+                {
+                    BilleteraId = billetera.Id,
+                    Billetera = billetera,
+                    Tipo = "AJUSTE_ADMINISTRATIVO",
+                    Monto = diferencia,
+                    FechaTransaccion = DateTime.UtcNow,
+                    Descripcion = $"Ajuste administrativo: {request.Motivo}"
+                });
+
+                _context.SaveChanges();
+                transaction.Commit();
+
+                return Ok(new
+                {
+                    mensaje = "Saldo actualizado correctamente por administrador.",
+                    nuevoSaldo = billetera.Saldo
+                });
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                return StatusCode(500, new { mensaje = "Error al ajustar el saldo.", detalle = ex.Message });
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UTNGolCoinApi.Data;
 using UTNGolCoinApi.Dtos;
+using UTNGolCoinApi.DTOs;
 using UTNGolCoinApi.Models;
 
 namespace UTNGolCoinApi.Controllers
@@ -16,23 +17,37 @@ namespace UTNGolCoinApi.Controllers
             _context = context;
         }
 
-        public class CrearPrediccionRequest
-        {
-            public string UsuarioId { get; set; }
-            public string PartidoCodigo { get; set; }
-            public string ResultadoPronosticado { get; set; }
-            public decimal MontoApostado { get; set; }
-            public decimal Cuota { get; set; }
-        }
 
         [HttpPost("crear")]
-        public IActionResult CrearPrediccion([FromBody] CrearPrediccionRequest request)
+        public IActionResult CrearPrediccion([FromBody] CrearPrediccion request)
         {
+           
             if (request.MontoApostado <= 0)
             {
                 return BadRequest(new { mensaje = "El monto apostado debe ser mayor a cero." });
             }
+            if (DateTime.TryParse(request.FechaPartidoUtc, out DateTime fechaConvertida))
+            {
+                if (DateTime.UtcNow >= fechaConvertida)
+                {
+                    return BadRequest(new { mensaje = "El partido ya comenzó. No se aceptan más predicciones." });
+                }
+            }
+            else
+            {
+                return BadRequest(new { mensaje = "El formato de la fecha del partido es inválido." });
+            }
 
+            bool yaPredijo = _context.Predicciones.Any(p =>
+                p.UsuarioId == request.UsuarioId &&
+                p.PartidoCodigo == request.PartidoCodigo);
+
+            if (yaPredijo)
+            {
+                return BadRequest(new { mensaje = "Ya realizaste una predicción para este partido." });
+            }
+
+           
             var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == request.UsuarioId);
 
             if (billetera == null)
@@ -45,74 +60,66 @@ namespace UTNGolCoinApi.Controllers
                 return BadRequest(new { mensaje = "Saldo insuficiente para realizar esta predicción." });
             }
 
-            billetera.Saldo -= request.MontoApostado;
-
-            var nuevaPrediccion = new Prediccion
+        
+            using var transaction = _context.Database.BeginTransaction();
+            try
             {
-                BilleteraId = billetera.Id,
-                UsuarioId = request.UsuarioId, 
-                PartidoId = request.PartidoCodigo, 
-                PartidoCodigo = request.PartidoCodigo,
-                ResultadoPronosticado = request.ResultadoPronosticado,
-                MontoApostado = request.MontoApostado,
-                Cuota = request.Cuota,
-                Estado = "PENDIENTE",
-                FechaRegistro = DateTime.UtcNow
-            };
+                
+                billetera.Saldo -= request.MontoApostado;
 
-            _context.Predicciones.Add(nuevaPrediccion);
+                var nuevaPrediccion = new Prediccion
+                {
+                    BilleteraId = billetera.Id,
+                    UsuarioId = request.UsuarioId,
+                    PartidoId = request.PartidoCodigo,
+                    PartidoCodigo = request.PartidoCodigo,
+                    ResultadoPronosticado = request.ResultadoPronosticado,
+                    MontoApostado = request.MontoApostado,
+                    Cuota = request.Cuota,
+                    Estado = "PENDIENTE",
+                    FechaRegistro = DateTime.UtcNow
+                };
+                _context.Predicciones.Add(nuevaPrediccion);
 
-            var transaccion = new Transaccion
-            {
-                BilleteraId = billetera.Id,
-                Billetera = billetera,
-                Tipo = "Prediccion",
-                Monto = -request.MontoApostado,
-                FechaTransaccion = DateTime.UtcNow
-            };
+                
+                var transaccion = new Transaccion
+                {
+                    BilleteraId = billetera.Id,
+                    Billetera = billetera,
+                    Tipo = "Prediccion",
+                    Monto = -request.MontoApostado,
+                    FechaTransaccion = DateTime.UtcNow
+                };
+                _context.Transacciones.Add(transaccion);
 
-            _context.Transacciones.Add(transaccion);
-            _context.SaveChanges();
+               
+                _context.SaveChanges();
+                transaction.Commit();
 
-            bool yaPredijo = _context.Predicciones.Any(p =>
-    p.UsuarioId == request.UsuarioId &&
-    p.PartidoCodigo == request.PartidoCodigo);
-
-            if (yaPredijo)
-            {
-                return BadRequest(new { mensaje = "Ya realizaste una predicción para este partido." });
+                return Ok(new
+                {
+                    exito = true,
+                    mensaje = "Predicción registrada exitosamente.",
+                    saldoRestante = billetera.Saldo,
+                    prediccionId = nuevaPrediccion.Id
+                });
             }
-
-            return Ok(new
+            catch (Exception)
             {
-                exito = true,
-                mensaje = "Predicción registrada exitosamente.",
-                saldoRestante = billetera.Saldo,
-                prediccionId = nuevaPrediccion.Id
-            });
-        }
-
-        [HttpGet("historial/{usuarioId}")]
-        public IActionResult ObtenerPrediccionesUsuario(string usuarioId)
-        {
-            var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
-
-            if (billetera == null)
-            {
-                return NotFound(new { mensaje = "No se encontró la billetera del usuario." });
+                transaction.Rollback();
+                return StatusCode(500, new { mensaje = "Error interno al procesar la predicción." });
             }
-
-            var predicciones = _context.Predicciones
-                .Where(p => p.BilleteraId == billetera.Id)
-                .OrderByDescending(p => p.FechaRegistro)
-                .ToList();
-
-            return Ok(predicciones);
         }
 
         [HttpPost("liquidar/{codigoPartido}")]
         public IActionResult LiquidarPredicciones(string codigoPartido, [FromBody] Resultado request)
         {
+           
+            if (request.ResultadoOficial < 1 || request.ResultadoOficial > 3)
+            {
+                return BadRequest(new { mensaje = "El resultado oficial debe ser 1 (Local), 2 (Visitante) o 3 (Empate)." });
+            }
+
             var prediccionesPendientes = _context.Predicciones
                 .Where(p => p.PartidoCodigo == codigoPartido && p.Estado == "PENDIENTE")
                 .ToList();
@@ -126,52 +133,60 @@ namespace UTNGolCoinApi.Controllers
             int perdedores = 0;
             decimal totalPagado = 0;
 
-            foreach (var prediccion in prediccionesPendientes)
+            using var transaction = _context.Database.BeginTransaction();
+
+            try
             {
-                if (prediccion.ResultadoPronosticado == request.ResultadoOficial)
+                foreach (var prediccion in prediccionesPendientes)
                 {
-                    prediccion.Estado = "GANADA";
-                    ganadores++;
-
-                    decimal premio = prediccion.MontoApostado * prediccion.Cuota;
-
-                    var billetera = _context.Billeteras.Find(prediccion.BilleteraId);
-                    if (billetera != null)
+                  
+                    if (prediccion.ResultadoPronosticado == request.ResultadoOficial.ToString())
                     {
-                        billetera.Saldo += premio;
-                        totalPagado += premio;
+                        prediccion.Estado = "GANADA";
+                        ganadores++;
 
-                        var transaccion = new Transaccion
+                        decimal premio = prediccion.MontoApostado * prediccion.Cuota;
+
+                        var billetera = _context.Billeteras.Find(prediccion.BilleteraId);
+                        if (billetera != null)
                         {
-                            BilleteraId = billetera.Id,
-                            Billetera = billetera,
-                            Tipo = "Premio",
-                            Monto = premio,
-                            FechaTransaccion = DateTime.UtcNow
-                        };
-                        _context.Transacciones.Add(transaccion);
+                            billetera.Saldo += premio;
+                            totalPagado += premio;
+
+                            var transaccion = new Transaccion
+                            {
+                                BilleteraId = billetera.Id,
+                                Billetera = billetera,
+                                Tipo = "Premio",
+                                Monto = premio,
+                                FechaTransaccion = DateTime.UtcNow,
+                                Descripcion = $"Premio por predicción ganada en partido {codigoPartido}"
+                            };
+                            _context.Transacciones.Add(transaccion);
+                        }
+                    }
+                    else
+                    {
+                        prediccion.Estado = "PERDIDA";
+                        perdedores++;
                     }
                 }
-                else
+
+                _context.SaveChanges();
+                transaction.Commit();
+
+                return Ok(new
                 {
-                    prediccion.Estado = "PERDIDA";
-                    perdedores++;
-                }
+                    exito = true,
+                    mensaje = $"Liquidación completada para el partido {codigoPartido}.",
+                    estadisticas = new { ganadores, perdedores, monedasRepartidas = totalPagado }
+                });
             }
-
-            _context.SaveChanges();
-
-            return Ok(new
+            catch (Exception)
             {
-                exito = true,
-                mensaje = $"Liquidación completada para el partido {codigoPartido}.",
-                estadisticas = new
-                {
-                    ganadores,
-                    perdedores,
-                    monedasRepartidas = totalPagado
-                }
-            });
+                transaction.Rollback();
+                return StatusCode(500, new { mensaje = "Error interno al liquidar las predicciones." });
+            }
         }
     }
 }

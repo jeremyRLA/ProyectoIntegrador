@@ -17,7 +17,6 @@ namespace UTNGolCoinApi.Controllers
         public PartidosController(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            // Asegúrate de que appsettings.json tenga: "ApiErickUrl": "http://192.168.1.46:8080"
             _apiErickUrl = configuration["ServiciosExternos:ApiErickUrl"];
         }
 
@@ -26,7 +25,7 @@ namespace UTNGolCoinApi.Controllers
         {
             try
             {
-                // La ruta exacta al contexto de Java
+               
                 string rutaEndpointErick = $"{_apiErickUrl}/api-estadisticas/api/partidos";
                 var response = await _httpClient.GetAsync(rutaEndpointErick);
 
@@ -40,7 +39,7 @@ namespace UTNGolCoinApi.Controllers
                 if (todosLosPartidos == null || !todosLosPartidos.Any())
                     return Ok(new List<PartidosDto>());
 
-                // Filtramos por PROGRAMADO y asignamos las cuotas al vuelo
+                
                 var partidosDisponibles = todosLosPartidos
                     .Where(p => p.estado != null && p.estado.ToUpper() == "PROGRAMADO")
                     .OrderBy(p => p.fecha_hora_utc)
