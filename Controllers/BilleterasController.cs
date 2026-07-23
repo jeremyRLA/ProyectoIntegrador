@@ -16,7 +16,7 @@ namespace UTNGolCoinApi.Controllers
 
         public class CrearBilleteraRequest
         {
-            public string usuario_id { get; set; } 
+            public string usuario_id { get; set; }
         }
 
         [HttpGet]
@@ -40,33 +40,43 @@ namespace UTNGolCoinApi.Controllers
                 return BadRequest(new { mensaje = "Este usuario ya tiene una billetera registrada." });
             }
 
-            var nuevaBilletera = new Billetera
+            using var transaction = _context.Database.BeginTransaction();
+            try
             {
-                UsuarioId = request.usuario_id,
-                Saldo = 10.00m
-            };
+                var nuevaBilletera = new Billetera
+                {
+                    UsuarioId = request.usuario_id,
+                    Saldo = 10.00m
+                };
 
-            _context.Billeteras.Add(nuevaBilletera);
-            _context.SaveChanges();
+                _context.Billeteras.Add(nuevaBilletera);
+                _context.SaveChanges(); 
 
-            var transaccion = new Transaccion
+                var transaccion = new Transaccion
+                {
+                    BilleteraId = nuevaBilletera.Id,
+                    Billetera = nuevaBilletera,
+                    Tipo = "BonoBienvenida",
+                    Monto = 10.00m,
+                    FechaTransaccion = DateTime.UtcNow
+                };
+
+                _context.Transacciones.Add(transaccion);
+                _context.SaveChanges();
+                transaction.Commit();
+
+                return Ok(new
+                {
+                    exito = true,
+                    mensaje = "Billetera creada exitosamente con el bono de bienvenida.",
+                    saldoActual = nuevaBilletera.Saldo
+                });
+            }
+            catch (Exception)
             {
-                BilleteraId = nuevaBilletera.Id,
-                Billetera = nuevaBilletera,
-                Tipo = "BonoBienvenida",
-                Monto = 10.00m,
-                FechaTransaccion = DateTime.UtcNow
-            };
-
-            _context.Transacciones.Add(transaccion);
-            _context.SaveChanges();
-
-            return Ok(new
-            {
-                exito = true,
-                mensaje = "Billetera creada exitosamente con el bono de bienvenida.",
-                saldoActual = nuevaBilletera.Saldo
-            });
+                transaction.Rollback();
+                return StatusCode(500, new { mensaje = "Error interno al crear la billetera." });
+            }
         }
 
         [HttpGet("saldo/{usuarioId}")]
@@ -78,7 +88,7 @@ namespace UTNGolCoinApi.Controllers
             return Ok(new { usuarioId = billetera.UsuarioId, saldo = billetera.Saldo });
         }
 
-[HttpGet("{usuarioId}/transacciones")]
+        [HttpGet("{usuarioId}/transacciones")]
         public IActionResult ObtenerHistorialTransacciones(string usuarioId)
         {
             var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
@@ -91,13 +101,7 @@ namespace UTNGolCoinApi.Controllers
             var transacciones = _context.Transacciones
                 .Where(t => t.BilleteraId == billetera.Id)
                 .OrderByDescending(t => t.FechaTransaccion)
-                .Select(t => new
-                {
-                    t.Id,
-                    t.Tipo,
-                    t.Monto,
-                    t.FechaTransaccion
-                })
+                .Select(t => new { t.Id, t.Tipo, t.Monto, t.FechaTransaccion })
                 .ToList();
 
             return Ok(new
@@ -107,125 +111,64 @@ namespace UTNGolCoinApi.Controllers
                 historial = transacciones
             });
         }
-        public class ResolverPrediccionRequest
-        {
-            public string ResultadoReal { get; set; }
-        }
 
-        [HttpPut("{id}/resolver")]
-        public IActionResult ResolverPrediccion(int id, [FromBody] ResolverPrediccionRequest request)
-        {
-            var prediccion = _context.Predicciones.FirstOrDefault(p => p.Id == id);
-
-            if (prediccion == null)
-            {
-                return NotFound(new { mensaje = "Predicción no encontrada." });
-            }
-
-            if (prediccion.Estado != "PENDIENTE")
-            {
-                return BadRequest(new { mensaje = "Esta predicción ya fue resuelta anteriormente." });
-            }
-
-            var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == prediccion.UsuarioId);
-
-            if (billetera == null)
-            {
-                return NotFound(new { mensaje = "No se encontró la billetera asociada a esta predicción." });
-            }
-
-            bool gano = prediccion.ResultadoPronosticado.ToUpper() == request.ResultadoReal.ToUpper();
-
-            if (gano)
-            {
-                prediccion.Estado = "GANADA";
-
-                decimal premio = prediccion.MontoApostado * prediccion.Cuota;
-                billetera.Saldo += premio;
-
-                var transaccion = new Transaccion
-                {
-                    BilleteraId = billetera.Id,
-                    Billetera = billetera,
-                    Tipo = "Premio",
-                    Monto = premio,
-                    FechaTransaccion = DateTime.UtcNow
-                };
-
-                _context.Transacciones.Add(transaccion);
-            }
-            else
-            {
-                prediccion.Estado = "PERDIDA";
-            }
-
-            _context.SaveChanges();
-
-            return Ok(new
-            {
-                exito = true,
-                mensaje = gano ? "¡Predicción ganada! Premio acreditado exitosamente." : "Predicción perdida. Suerte para la próxima.",
-                estadoNuevo = prediccion.Estado,
-                saldoActual = billetera.Saldo
-            });
-        }
         [HttpPost("{usuarioId}/bono")]
         public IActionResult ReclamarBonoDiario(string usuarioId)
         {
             var billetera = _context.Billeteras.FirstOrDefault(b => b.UsuarioId == usuarioId);
 
             if (billetera == null)
-            {
                 return NotFound(new { mensaje = "No se encontró la billetera del usuario." });
-            }
+
             if (billetera.Saldo > 0)
-            {
-                return BadRequest(new {mensaje ="El bono solo aplica cuando el saldo es cero"});
-            }
+                return BadRequest(new { mensaje = "El bono solo aplica cuando el saldo es cero" });
 
             var hoy = DateTime.UtcNow.Date;
-
-            bool yaReclamo = _context.BonosDiarios.Any(b =>
-                b.BilleteraId == billetera.Id &&
-                b.FechaBono.Date == hoy);
+            bool yaReclamo = _context.BonosDiarios.Any(b => b.BilleteraId == billetera.Id && b.FechaBono.Date == hoy);
 
             if (yaReclamo)
-            {
                 return BadRequest(new { mensaje = "Ya reclamaste tu bono de hoy. Vuelve mañana." });
+
+            using var transaction = _context.Database.BeginTransaction();
+            try
+            {
+                decimal montoBono = 1.00m;
+                billetera.Saldo += montoBono;
+
+                var bono = new BonoDiario
+                {
+                    BilleteraId = billetera.Id,
+                    FechaBono = DateTime.UtcNow,
+                    Monto = montoBono
+                };
+
+                var transaccion = new Transaccion
+                {
+                    BilleteraId = billetera.Id,
+                    Billetera = billetera,
+                    Tipo = "Bono Diario",
+                    Monto = montoBono,
+                    FechaTransaccion = DateTime.UtcNow
+                };
+
+                _context.BonosDiarios.Add(bono);
+                _context.Transacciones.Add(transaccion);
+
+                _context.SaveChanges();
+                transaction.Commit();
+
+                return Ok(new
+                {
+                    exito = true,
+                    mensaje = $"¡Bono diario de {montoBono} monedas reclamado exitosamente!",
+                    saldoActual = billetera.Saldo
+                });
             }
-
-            decimal montoBono = 1.00m;
-
-            billetera.Saldo += montoBono;
-
-            var bono = new BonoDiario
+            catch (Exception)
             {
-                BilleteraId = billetera.Id,
-                FechaBono = DateTime.UtcNow,
-                Monto = montoBono
-            };
-
-            var transaccion = new Transaccion
-
-            {
-                BilleteraId = billetera.Id,
-                Billetera = billetera,
-                Tipo = "Bono Diario",
-                Monto = montoBono,
-                FechaTransaccion = DateTime.UtcNow
-            };
-
-            _context.BonosDiarios.Add(bono);
-            _context.Transacciones.Add(transaccion);
-            _context.SaveChanges();
-
-            return Ok(new
-            {
-                exito = true,
-                mensaje = $"¡Bono diario de {montoBono} monedas reclamado exitosamente!",
-                saldoActual = billetera.Saldo
-            });
+                transaction.Rollback();
+                return StatusCode(500, new { mensaje = "Ocurrió un error al procesar el bono diario." });
+            }
         }
     }
-
 }

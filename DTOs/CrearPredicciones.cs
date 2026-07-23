@@ -7,5 +7,6 @@
         public string ResultadoPronosticado { get; set; }
         public decimal MontoApostado { get; set; }
         public decimal Cuota { get; set; }
+        public string FechaPartidoUtc { get; set; }
     }
 }

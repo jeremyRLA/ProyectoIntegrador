@@ -74,6 +74,15 @@ namespace UTNGolCoinApi.Controllers
             _context.Transacciones.Add(transaccion);
             _context.SaveChanges();
 
+            bool yaPredijo = _context.Predicciones.Any(p =>
+    p.UsuarioId == request.UsuarioId &&
+    p.PartidoCodigo == request.PartidoCodigo);
+
+            if (yaPredijo)
+            {
+                return BadRequest(new { mensaje = "Ya realizaste una predicción para este partido." });
+            }
+
             return Ok(new
             {
                 exito = true,
