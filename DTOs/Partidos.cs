@@ -2,7 +2,7 @@
 {
     using System;
 
-    public class PartidosDto
+    public class Partidos
     {
         public int? id { get; set; }
         public int? numero_partido_fifa { get; set; }

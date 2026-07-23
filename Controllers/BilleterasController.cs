@@ -15,11 +15,6 @@ namespace UTNGolCoinApi.Controllers
             _context = context;
         }
 
-        public class CrearBilleteraRequest
-        {
-            public string usuario_id { get; set; }
-        }
-
         [HttpGet]
         public IActionResult ObtenerTodasLasBilleteras()
         {

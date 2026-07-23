@@ -34,10 +34,10 @@ namespace UTNGolCoinApi.Controllers
 
                 var json = await response.Content.ReadAsStringAsync();
                 var opciones = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var todosLosPartidos = JsonSerializer.Deserialize<List<PartidosDto>>(json, opciones);
+                var todosLosPartidos = JsonSerializer.Deserialize<List<Partidos>>(json, opciones);
 
                 if (todosLosPartidos == null || !todosLosPartidos.Any())
-                    return Ok(new List<PartidosDto>());
+                    return Ok(new List<Partidos>());
 
                 
                 var partidosDisponibles = todosLosPartidos

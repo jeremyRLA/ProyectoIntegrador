@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using UTNGolCoinApi.Data;
-using UTNGolCoinApi.Dtos;
 using UTNGolCoinApi.DTOs;
 using UTNGolCoinApi.Models;
 
